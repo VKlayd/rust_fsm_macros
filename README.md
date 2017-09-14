@@ -5,17 +5,20 @@
 # Define FSM:
 
     FSM!(
-      name: fsm (init: State1);
+      fsm (State1{x:0})
     
-      states:(State1, State2);
-      commands:(ToState1, ToState2);
+      commands:(ToState1, ToState2)
 
-      ( State1:
-        {ToState2;     {};             State2}
-      ),
-      ( State2:
-        {ToState1;     {};             State1},
-        {ToState2;     {println!("Already in State2!");};             State2}
+      ( State1 context{x:i16}
+        >>{}
+        <<{}
+        {ToState2;     ;             State2{x:context.x+1}}
+      )
+      ( State2 context{x:i16}
+        >>{}
+        <<{}
+        {ToState1;     ;             State1{x:0}},
+        {ToState2;     {println!("Already in State2!");};}
       )
     );
 
