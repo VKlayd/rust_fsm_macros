@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+#[macro_export]
 macro_rules! FSM {
     (@inner next $new_state:ident{$($new_el:ident:$new_el_val:expr),*}) => (
         $new_state{$($new_el:$new_el_val),*}
@@ -12,36 +14,48 @@ macro_rules! FSM {
             Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
-    (@inner command $cur:ident;$callback:block;) => ({$callback; Some(States::__SameState__)});
-    (@inner command $cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => ({
-        Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
-    });
-    (@inner command $cur:ident ; ;) => (Some(States::__SameState__));
+
+    (@inner command $cur:ident;$callback:block;) => (
+        {
+            $callback;
+            Some(States::__SameState__)
+        }
+    );
+
+    (@inner command $cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+        {
+            Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
+        }
+    );
+
+    (@inner command $cur:ident ; ;) => (
+        Some(States::__SameState__)
+    );
 
     (@inner context $ss:ident $sel:ident)=>(let $sel = $ss;);
     (@inner context $ss:ident )=>();
 
     (@inner >> $($sel:ident)* $income:block) => (
-            fn enter(&self) -> Result<(), ()> {
+            fn enter(&mut self) -> Result<(), ()> {
                 FSM!(@inner context self $($sel)*);
                 $income
                 Ok(())
             }
     );
     (@inner << $($sel:ident)* $outcome:block) => (
-            fn leave(&self) -> Result<(), ()> {
+            fn leave(&mut self) -> Result<(), ()> {
                 FSM!(@inner context self $($sel)*);
                 $outcome
                 Ok(())
             }
     );
     (@inner >> $($sel:ident)*) => (
-            fn enter(&self) -> Result<(), ()> {
+            fn enter(&mut self) -> Result<(), ()> {
                 Ok(())
             }
     );
     (@inner << $($sel:ident)*) => (
-            fn leave(&self) -> Result<(), ()> {
+            fn leave(&mut self) -> Result<(), ()> {
                 Ok(())
             }
     );
@@ -49,12 +63,16 @@ macro_rules! FSM {
     (@inner params $state:ident {$($el:ident:$typ:ty);*}) => (
         #[derive(Debug)]
         #[derive(PartialEq)]
-        struct $state {$($el:$typ),*}
+        #[derive(Copy)]
+        #[derive(Clone)]
+        pub struct $state {pub $($el:$typ),*}
     );
     (@inner params $state:ident) => (
         #[derive(Debug)]
         #[derive(PartialEq)]
-        struct $state {}
+        #[derive(Copy)]
+        #[derive(Clone)]
+        pub struct $state {}
     );
     (@inner initial $initial:ident{$($init_field:ident:$init_val:expr),*}) => ($initial{$($init_field: $init_val),*});
     (@inner initial $initial:ident) => ($initial{});
@@ -70,12 +88,16 @@ macro_rules! FSM {
         $($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*
     ))*
 ) => (
+    #[allow(non_snake_case)]
+    #[allow(unused_imports)]
+    #[allow(dead_code)]
+    #[allow(unused_variables)]
     mod $machine {
         use super::*;
         trait CanDoJob {
             fn do_job(&mut self, cmd: &Commands) -> Option<States>;
-            fn leave(&self) -> Result<(), ()>;
-            fn enter(&self) -> Result<(), ()>;
+            fn leave(&mut self) -> Result<(), ()>;
+            fn enter(&mut self) -> Result<(), ()>;
         }
 
         $(
@@ -98,7 +120,9 @@ macro_rules! FSM {
 
         #[derive(Debug)]
         #[derive(PartialEq)]
-        enum States {
+        #[derive(Copy)]
+        #[derive(Clone)]
+        pub enum States {
             __SameState__,
             $($states {context: $states}),*
         }
@@ -113,7 +137,7 @@ macro_rules! FSM {
             state: States
         }
         pub fn new() -> Machine {
-            let context = FSM!(@inner initial $initial $({$($init_field: $init_val),*})*);
+            let mut context = FSM!(@inner initial $initial $({$($init_field: $init_val),*})*);
             context.enter().unwrap();
             Machine{state: States::$initial{context: context}}
         }
@@ -147,6 +171,9 @@ macro_rules! FSM {
                     States::__SameState__ => Ok(()),
                     $(States::$state{ ref mut context } => context.enter()),*
                 }.unwrap();
+            }
+            pub fn state(&self) -> States {
+                self.state.clone()
             }
         }
     }
@@ -204,14 +231,13 @@ mod tests {
     #[test]
     fn test1() {
         let mut m = Mach1::new();
-        m.execute(&Mach1::Commands::Configure);
-        m.execute(&Mach1::Commands::ConfigureDone);
-        m.execute(&Mach1::Commands::Configure);
-        m.execute(&Mach1::Commands::Drop);
-        m.execute(&Mach1::Commands::Configure);
-        m.execute(&Mach1::Commands::ConfigureDone);
-        m.execute(&Mach1::Commands::ConfigureDone);
-        m.execute(&Mach1::Commands::ConfigureDone);
+        m.execute(&Mach1::Commands::Configure).unwrap();
+        m.execute(&Mach1::Commands::ConfigureDone).unwrap();
+        m.execute(&Mach1::Commands::Drop).unwrap();
+        m.execute(&Mach1::Commands::Configure).unwrap();
+        m.execute(&Mach1::Commands::ConfigureDone).unwrap();
+        m.execute(&Mach1::Commands::ConfigureDone).unwrap();
+        m.execute(&Mach1::Commands::ConfigureDone).unwrap();
     }
 
     #[test]
