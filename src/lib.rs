@@ -1,13 +1,140 @@
 #![deny(unused_must_use)]
+//! State machine generator
+//!
+//! State machine consists of:
+//! Name, initial state, List of States, List of Commands, list of States Nodes.
+//! Each State Node contain: Name, State Context (optional), list of Command Reactions.
+//! Each Command Reaction contain: Command to react on, user-defined code of reaction (optional) and
+//!     next State of machine (optional).
+//!
+//! Simplest state machine example:
+//!
+//! ```
+//! #[macro_use] extern crate Rust_fsm;
+//!
+//! FSM!(
+//!     Simple(A) // Name and initial State
+//!     states[A,B] // list of States
+//!     commands[Next] // list of Commands
+//!     (A: // State Node
+//!         Next => B; // Command Reaction. Just change state to B
+//!     )
+//!     (B:
+//!         Next => A;
+//!     )
+//! );
+//!
+//! # fn main() {
+//! use Simple::*;
+//!
+//! let mut machine = Simple::new();
+//! assert!(match machine.state(){States::A{..}=>true,_=>false});
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! assert!(match machine.state(){States::B{..}=>true,_=>false});
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! assert!(match machine.state(){States::A{..}=>true,_=>false});
+//! # }
+//! ```
+//!
+//! You can add some intelligence to machine:
+//!
+//! ```
+//! #[macro_use] extern crate Rust_fsm;
+//!
+//! FSM!(
+//!     Simple(A{counter:0}) // Name and initial State with initial value
+//!     states[A,B] // list of States
+//!     commands[Next] // list of Commands
+//!     (A context{counter:i16}: // State Node and this state context description with binding name
+//!         Next {context.counter=context.counter+1}=> B{counter:context.counter}; // Command Reaction. Now on command Next we add 1 to our context. Also we change state to B and init it with our x value.
+//!     )
+//!     (B context{counter:i16}:
+//!         Next {context.counter=context.counter+1}=> A{counter:context.counter};
+//!     )
+//! );
+//!
+//! # fn main() {
+//! use Simple::*;
+//!
+//! let mut machine = Simple::new();
+//! assert!(match machine.state(){
+//!     States::A{context}=> if context.counter == 0 {true} else {false}, // We are in state A and have our initial value 0
+//!     _=>false
+//! });
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! assert!(match machine.state(){
+//!     States::B{context}=> if context.counter == 1 {true} else {false}, // We are in state B and have counter == 1
+//!     _=>false
+//! });
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! assert!(match machine.state(){
+//!     States::A{context}=> if context.counter == 2 {true} else {false}, // Again in state A and have counter == 2
+//!     _=>false
+//! });
+//! # }
+//! ```
+//! ```
+//! #[macro_use] extern crate Rust_fsm;
+//!
+//! FSM!(
+//!     Simple(A{counter:0}) // Name and initial State with initial value
+//!     states[A,B] // list of States
+//!     commands[Next] // list of Commands
+//!     (A context{counter:i16}: // State Node and this state context description with binding name
+//!         >> {context.counter = context.counter+1;} // Execute when enter state A
+//!         << {context.counter = context.counter+1;} // Execute when leave state A
+//!         Next {context.counter=context.counter+1;} => B{counter:context.counter}; // Command Reaction. Now on command Next we add 1 to our context. Also we change state to B and init it with our x value.
+//!     )
+//!     (B context{counter:i16}:
+//!         Next {context.counter=context.counter+1} => A{counter:context.counter};
+//!     )
+//! );
+//!
+//! # fn main() {
+//! use Simple::*;
+//!
+//! let mut machine = Simple::new();
+//! assert!(match machine.state(){
+//!
+//!     // We are in state A and have value 1. Because Enter State callback executed.
+//!
+//!     States::A{context}=> if context.counter == 1 {true} else {false},
+//!     _=>false
+//! });
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! assert!(match machine.state(){
+//!
+//!     // We are in state B and have counter == 2. Increment happen on User Code execution. Execution of Leave state callback happen after we transfer data to the next state.
+//!
+//!     States::B{context}=> {println!("context counter: {}", context.counter);if context.counter == 2 {true} else {false}},
+//!     _=>false
+//! });
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! assert!(match machine.state(){
+//!
+//!     // Again in state A and have counter == 4. Increment happen on User Code execution and on state A enter.
+//!
+//!     States::A{context}=> if context.counter == 4 {true} else {false},
+//!     _=>false
+//! });
+//! # }
+//! ```
+//!
+
 #[macro_export]
 macro_rules! FSM {
+
+    // Initialize state by values
     (@inner next $new_state:ident{$($new_el:ident:$new_el_val:expr),*}) => (
         $new_state{$($new_el:$new_el_val),*}
     );
+
+    // if state have no fields to initialize. Just for remove redundant curl braces.
     (@inner next $new_state:ident) => (
         $new_state{}
     );
 
+    // If Event have user-defined code and move machine to new state. Execute code and return new state.
     (@inner command $cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             $callback;
@@ -15,6 +142,7 @@ macro_rules! FSM {
         }
     );
 
+    // If Event have user-defined code and don't move machine to new state. Execute code and return __SameState__ .
     (@inner command $cur:ident;$callback:block;) => (
         {
             $callback;
@@ -22,12 +150,14 @@ macro_rules! FSM {
         }
     );
 
+    // If Event have no user-defined code and move machine to new state. Just return new state.
     (@inner command $cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
 
+    // If Event have nothing to do on event. Just return __SameState__.
     (@inner command $cur:ident ; ;) => (
         Some(States::__SameState__)
     );
@@ -35,6 +165,7 @@ macro_rules! FSM {
     (@inner context $ss:ident $sel:ident)=>(let $sel = $ss;);
     (@inner context $ss:ident )=>();
 
+    // Enter/Leave processors with and without user-defined code.
     (@inner >> $($sel:ident)* $income:block) => (
             fn enter(&mut self) -> Result<(), ()> {
                 FSM!(@inner context self $($sel)*);
@@ -60,6 +191,7 @@ macro_rules! FSM {
             }
     );
 
+    // This structs keep user-defined contexts for states.
     (@inner params $state:ident {$($el:ident:$typ:ty);*}) => (
         #[derive(Debug)]
         #[derive(PartialEq)]
@@ -76,6 +208,8 @@ macro_rules! FSM {
     );
     (@inner initial $initial:ident{$($init_field:ident:$init_val:expr),*}) => ($initial{$($init_field: $init_val),*});
     (@inner initial $initial:ident) => ($initial{});
+
+// Main pattern
 
 (
     $machine:ident ($initial:ident$({$($init_field:ident:$init_val:expr),*})*)
