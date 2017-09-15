@@ -1,26 +1,72 @@
 macro_rules! FSM {
-    (@inner command $cur:ident;$callback:block;$new_state:ident{$($new_el:ident:$new_el_val:expr),*}) => (
+    (@inner next $new_state:ident{$($new_el:ident:$new_el_val:expr),*}) => (
+        $new_state{$($new_el:$new_el_val),*}
+    );
+    (@inner next $new_state:ident) => (
+        $new_state{}
+    );
+
+    (@inner command $cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             $callback;
-            Some(States::$new_state{context: $new_state{$($new_el:$new_el_val),*}})
+            Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
     (@inner command $cur:ident;$callback:block;) => ({$callback; Some(States::__SameState__)});
-    (@inner command $cur:ident; ;$new_state:ident{$($new_el:ident:$new_el_val:expr),*}) => ({
-        Some(States::$new_state{context: $new_state{$($new_el:$new_el_val),*}})
+    (@inner command $cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => ({
+        Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
     });
     (@inner command $cur:ident ; ;) => (Some(States::__SameState__));
-(
-    $machine:ident ($initial:ident{$($init_field:ident:$init_val:expr),*})
-    commands:($($commands:ident),*)
 
-    $(($state:ident $sel:ident{$($el:ident:$typ:ty),*}
-        >> $income:block
-        << $outcome:block
-        $({$cmd:ident;$($callback:block)*;$($new_state:ident{$($new_el:ident:$new_el_val:expr),*})*})*
+    (@inner >> $sel:ident $income:block) => (
+            fn enter(&self) -> Result<(), ()> {
+                let $sel = self;
+                $income
+                Ok(())
+            }
+    );
+    (@inner << $sel:ident $outcome:block) => (
+            fn leave(&self) -> Result<(), ()> {
+                let $sel = self;
+                $outcome
+                Ok(())
+            }
+    );
+    (@inner >> $sel:ident) => (
+            fn enter(&self) -> Result<(), ()> {
+                Ok(())
+            }
+    );
+    (@inner << $sel:ident) => (
+            fn leave(&self) -> Result<(), ()> {
+                Ok(())
+            }
+    );
+    (@inner params $state:ident {$($el:ident:$typ:ty);*}) => (
+        #[derive(Debug)]
+        #[derive(PartialEq)]
+        struct $state {$($el:$typ),*}
+    );
+    (@inner params $state:ident) => (
+        #[derive(Debug)]
+        #[derive(PartialEq)]
+        struct $state {}
+    );
+    (@inner initial $initial:ident{$($init_field:ident:$init_val:expr),*}) => ($initial{$($init_field: $init_val),*});
+    (@inner initial $initial:ident) => ($initial{});
+(
+    $machine:ident ($initial:ident$({$($init_field:ident:$init_val:expr),*})*)
+    states[$($states:ident),*]
+    commands[$($commands:ident),*]
+
+    $(($state:ident $sel:ident$({$($el:ident:$typ:ty);*})*
+        $(>> $income:block)*
+        $(<< $outcome:block)*
+        $($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*
     ))*
 ) => (
     mod $machine {
+    use super::*;
         trait CanDoJob {
             fn do_job(&mut self, cmd: &Commands) -> Option<States>;
             fn leave(&self) -> Result<(), ()>;
@@ -28,28 +74,19 @@ macro_rules! FSM {
         }
 
         $(
-        #[derive(Debug)]
-        #[derive(PartialEq)]
-        struct $state{$($el:$typ),*}
+        FSM!(@inner params $state $({$($el:$typ);*})*);
 
         impl CanDoJob for $state {
             fn do_job(&mut self, cmd: & Commands) -> Option<States> {
                 let $sel = self;
                 match *cmd {
-                    $(Commands::$cmd => {FSM!(@inner command self;$($callback)*;$($new_state{$($new_el:$new_el_val),*})*)})*
+                    $(Commands::$cmd => {FSM!(@inner command self;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
                     _ => None
                 }
             }
-            fn leave(&self) -> Result<(), ()> {
-                let $sel = self;
-                $outcome
-                Ok(())
-            }
-            fn enter(&self) -> Result<(), ()> {
-                let $sel = self;
-                $income
-                Ok(())
-            }
+
+            FSM!(@inner >> $sel $($income)*);
+            FSM!(@inner << $sel $($outcome)*);
         }
         )*
 
@@ -58,7 +95,7 @@ macro_rules! FSM {
         #[derive(PartialEq)]
         enum States {
             __SameState__,
-            $($state {context: $state}),*
+            $($states {context: $states}),*
         }
 
         #[derive(Debug)]
@@ -71,13 +108,13 @@ macro_rules! FSM {
             state: States
         }
         pub fn new() -> Machine {
-            let context = $initial{$($init_field: $init_val),*};
+            let context = FSM!(@inner initial $initial $({$($init_field: $init_val),*})*);
             context.enter().unwrap();
             Machine{state: States::$initial{context: context}}
         }
 
         impl Machine {
-            pub fn execute(&mut self, cmd: & Commands) {
+            pub fn execute(&mut self, cmd: & Commands) -> Result<(),()>{
                 match {
                     match self.state {
                         States::__SameState__ => None,
@@ -90,9 +127,9 @@ macro_rules! FSM {
                             _ => {
                                 self.change_state(x)
                             }
-                        }
+                        };Ok(())
                     },
-                    None => println!("Wrong operation {:?} for {:?} state!", cmd, self.state)
+                    None => {println!("Wrong operation {:?} for {:?} state!", cmd, self.state); Err(())}
                 }
             }
             fn change_state(&mut self, new_state: States) {
@@ -113,28 +150,49 @@ macro_rules! FSM {
 
 #[cfg(test)]
 mod tests {
+    fn tes(x:i16) {
+        println!("x:{}",x);
+    }
 
     FSM!(
     Mach1 (New{x:0})
 
-    commands:(Configure, ConfigureDone, Drop)
+    states[New,InConfig,Operational]
+    commands[Configure, ConfigureDone, Drop]
 
     ( New context{x: i16}
         >> {println!("Enter {:?}", context)}
         << {println!("Leave {:?}", context)}
-        {Configure;     {println!("In New with context val: {}", context.x);};     InConfig{x:context.x+1, y:0}}
-        {ConfigureDone; ; New{x:0}}
+        Configure     {println!("In New with context val: {}", context.x);} =>     InConfig{x:context.x+1, y:0};
+        ConfigureDone => New{x:0};
     )
-    ( InConfig context{x:i16, y:i16}
+    ( InConfig context{x:i16; y:i16}
         >> {println!("Enter {:?}", context)}
         << {println!("Leave {:?}", context)}
-        {ConfigureDone; ; Operational{x:context.x+1, y:context.y+1}}
+        ConfigureDone {tes(context.x)}=> Operational;
     )
-    ( Operational context{x:i16, y:i16}
+    ( Operational context
         >> {println!("Enter {:?}", context)}
         << {println!("Leave {:?}", context)}
-        {ConfigureDone; ; }
-        {Drop; ; New{x:context.x+1}}
+        ConfigureDone =>;
+        Drop => New{x:0};
+    )
+    );
+
+    FSM!(
+    Mach2 (State1)
+
+    states[State1,State2,State3]
+    commands[ToState1, ToState2, ToState3]
+
+    ( State1 context
+        ToState2 => State2;
+    )
+    ( State2 context
+        ToState3 => State3;
+    )
+    ( State3 context
+        ToState1 => State1;
     )
     );
 
@@ -149,5 +207,15 @@ mod tests {
         m.execute(&Mach1::Commands::ConfigureDone);
         m.execute(&Mach1::Commands::ConfigureDone);
         m.execute(&Mach1::Commands::ConfigureDone);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test2() {
+        let mut m = Mach2::new();
+        m.execute(&Mach2::Commands::ToState2).unwrap();
+        m.execute(&Mach2::Commands::ToState3).unwrap();
+        m.execute(&Mach2::Commands::ToState1).unwrap();
+        m.execute(&Mach2::Commands::ToState3).unwrap();
     }
 }
