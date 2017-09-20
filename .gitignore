@@ -1,2 +1,5 @@
 /target/
 **/*.rs.bk
+*.un~
+.idea
+macro_machine.iml
