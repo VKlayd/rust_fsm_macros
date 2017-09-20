@@ -1,6 +1,6 @@
 [package]
-name = "Rust_fsm"
+name = "macro_machine"
 version = "0.1.0"
-authors = ["Коркин Виктор Владимирович <victor.korkin@eltex.loc>"]
+authors = ["Victor Korkin <victor.korkin@eltex.loc>"]
 
 [dependencies]

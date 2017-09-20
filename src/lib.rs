@@ -10,9 +10,9 @@
 //! Simplest state machine example:
 //!
 //! ```
-//! #[macro_use] extern crate Rust_fsm;
+//! #[macro_use] extern crate macro_machine;
 //!
-//! FSM!(
+//! declare_machine!(
 //!     Simple(A) // Name and initial State
 //!     states[A,B] // list of States
 //!     commands[Next] // list of Commands
@@ -39,9 +39,9 @@
 //! You can add some intelligence to machine:
 //!
 //! ```
-//! #[macro_use] extern crate Rust_fsm;
+//! #[macro_use] extern crate macro_machine;
 //!
-//! FSM!(
+//! declare_machine!(
 //!     Simple(A{counter:0}) // Name and initial State with initial value
 //!     states[A,B] // list of States
 //!     commands[Next] // list of Commands
@@ -74,9 +74,9 @@
 //! # }
 //! ```
 //! ```
-//! #[macro_use] extern crate Rust_fsm;
+//! #[macro_use] extern crate macro_machine;
 //!
-//! FSM!(
+//! declare_machine!(
 //!     Simple(A{counter:0}) // Name and initial State with initial value
 //!     states[A,B] // list of States
 //!     commands[Next] // list of Commands
@@ -122,7 +122,7 @@
 //!
 
 #[macro_export]
-macro_rules! FSM {
+macro_rules! declare_machine {
 
     // Initialize state by values
     (@inner next $new_state:ident{$($new_el:ident:$new_el_val:expr),*}) => (
@@ -138,7 +138,7 @@ macro_rules! FSM {
     (@inner command $cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             $callback;
-            Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
+            Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
 
@@ -153,7 +153,7 @@ macro_rules! FSM {
     // If Event have no user-defined code and move machine to new state. Just return new state.
     (@inner command $cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
-            Some(States::$new_state{context: FSM!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
+            Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
 
@@ -168,14 +168,14 @@ macro_rules! FSM {
     // Enter/Leave processors with and without user-defined code.
     (@inner >> $($sel:ident)* $income:block) => (
             fn enter(&mut self) -> Result<(), ()> {
-                FSM!(@inner context self $($sel)*);
+                declare_machine!(@inner context self $($sel)*);
                 $income
                 Ok(())
             }
     );
     (@inner << $($sel:ident)* $outcome:block) => (
             fn leave(&mut self) -> Result<(), ()> {
-                FSM!(@inner context self $($sel)*);
+                declare_machine!(@inner context self $($sel)*);
                 $outcome
                 Ok(())
             }
@@ -235,19 +235,19 @@ macro_rules! FSM {
         }
 
         $(
-        FSM!(@inner params $state $({$($el:$typ);*})*);
+        declare_machine!(@inner params $state $({$($el:$typ);*})*);
 
         impl CanDoJob for $state {
             fn do_job(&mut self, cmd: & Commands) -> Option<States> {
-                FSM!(@inner context self $($sel)*);
+                declare_machine!(@inner context self $($sel)*);
                 match *cmd {
-                    $(Commands::$cmd => {FSM!(@inner command self;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
+                    $(Commands::$cmd => {declare_machine!(@inner command self;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
                     _ => None
                 }
             }
 
-            FSM!(@inner >> $($sel)* $($income)*);
-            FSM!(@inner << $($sel)* $($outcome)*);
+            declare_machine!(@inner >> $($sel)* $($income)*);
+            declare_machine!(@inner << $($sel)* $($outcome)*);
         }
         )*
 
@@ -271,7 +271,7 @@ macro_rules! FSM {
             state: States
         }
         pub fn new() -> Machine {
-            let mut context = FSM!(@inner initial $initial $({$($init_field: $init_val),*})*);
+            let mut context = declare_machine!(@inner initial $initial $({$($init_field: $init_val),*})*);
             context.enter().unwrap();
             Machine{state: States::$initial{context: context}}
         }
@@ -320,7 +320,7 @@ mod tests {
         println!("x:{}",x);
     }
 
-    FSM!(
+    declare_machine!(
     Mach1 (New{x:0})
 
     states[New,InConfig,Operational]
@@ -345,7 +345,7 @@ mod tests {
     )
     );
 
-    FSM!(
+    declare_machine!(
     Mach2 (State1)
 
     states[State1,State2,State3]
