@@ -12,8 +12,8 @@ Each Command Reaction contain: Command to react on, user-defined code of reactio
 
 Simplest state machine example:
 ```rust
-#[macro_use] extern crate Rust_fsm;
-FSM!(
+#[macro_use] extern crate macro_machine;
+declare_machine!(
     Simple(A) // Name and initial State
     states[A,B] // list of States
     commands[Next] // list of Commands
@@ -41,8 +41,8 @@ You can add some intelligence to machine.
 Each state can hold some data. On State change you can transmit some data between states.
 It looks like you just create struct with some fields initialization:
 ```rust
-#[macro_use] extern crate Rust_fsm;
-FSM!(
+#[macro_use] extern crate macro_machine;
+declare_machine!(
     Simple(A{counter:0}) // Name and initial State with initial value
     states[A,B] // list of States
     commands[Next] // list of Commands
@@ -86,8 +86,8 @@ fn main() {
 Also there is callbacks on each entrance and each leave of state.
  
 ```rust
-#[macro_use] extern crate Rust_fsm;
-FSM!(
+#[macro_use] extern crate macro_machine;
+declare_machine!(
     Simple(A{counter:0}) // Name and initial State with initial value
     states[A,B] // list of States
     commands[Next] // list of Commands

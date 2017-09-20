@@ -1,6 +1,6 @@
 [package]
 name = "macro_machine"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Victor Korkin <victor.korkin@eltex.loc>"]
 
 description = "State machine generator using macros."
