@@ -3,4 +3,14 @@ name = "macro_machine"
 version = "0.1.0"
 authors = ["Victor Korkin <victor.korkin@eltex.loc>"]
 
+description = "State machine generator using macros."
+
+readme = "README.md"
+
+repository = "https://github.com/VKlayd/rust_fsm_macros"
+
+keywords = ["state","machine","fsm","macro"]
+
+license = "MIT"
+
 [dependencies]
