@@ -104,17 +104,17 @@
 //! machine.execute(&Simple::Commands::Next).unwrap();
 //! assert!(match machine.state(){
 //!
-//!     // We are in state B and have counter == 2. Increment happen on User Code execution. Execution of Leave state callback happen after we transfer data to the next state.
+//!     // We are in state B and have counter == 3. Increment happen on User Code execution. Execution of Leave state callback happen after we transfer data to the next state.
 //!
-//!     States::B{context}=> {println!("context counter: {}", context.counter);if context.counter == 2 {true} else {false}},
+//!     States::B{context}=> {println!("context counter: {}", context.counter);if context.counter == 3 {true} else {false}},
 //!     _=>false
 //! });
 //! machine.execute(&Simple::Commands::Next).unwrap();
 //! assert!(match machine.state(){
 //!
-//!     // Again in state A and have counter == 4. Increment happen on User Code execution and on state A enter.
+//!     // Again in state A and have counter == 5. Increment happen on User Code execution and on state A enter.
 //!
-//!     States::A{context}=> if context.counter == 4 {true} else {false},
+//!     States::A{context}=> if context.counter == 5 {true} else {false},
 //!     _=>false
 //! });
 //! # }
@@ -135,7 +135,40 @@ macro_rules! declare_machine {
     );
 
     // If Event have user-defined code and move machine to new state. Execute code and return new state.
-    (@inner command $cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+    (@inner command $sel:ident:$cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+        {
+            declare_machine!(@inner context $sel $cur);
+            $callback;
+            $cur.leave().unwrap();
+            Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
+        }
+    );
+
+    // If Event have user-defined code and don't move machine to new state. Execute code and return __SameState__ .
+    (@inner command $sel:ident:$cur:ident;$callback:block;) => (
+        {
+            declare_machine!(@inner context $sel $cur);
+            $callback;
+            Some(States::__SameState__)
+        }
+    );
+
+    // If Event have no user-defined code and move machine to new state. Just return new state.
+    (@inner command $sel:ident:$cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+        {
+            declare_machine!(@inner context $sel $cur);
+            $cur.leave().unwrap();
+            Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
+        }
+    );
+
+    // If Event have nothing to do on event. Just return __SameState__.
+    (@inner command $sel:ident:$cur:ident ; ;) => (
+        Some(States::__SameState__)
+    );
+
+    // If Event have user-defined code and move machine to new state. Execute code and return new state.
+    (@inner command ;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             $callback;
             Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
@@ -143,7 +176,7 @@ macro_rules! declare_machine {
     );
 
     // If Event have user-defined code and don't move machine to new state. Execute code and return __SameState__ .
-    (@inner command $cur:ident;$callback:block;) => (
+    (@inner command ;$callback:block;) => (
         {
             $callback;
             Some(States::__SameState__)
@@ -151,14 +184,14 @@ macro_rules! declare_machine {
     );
 
     // If Event have no user-defined code and move machine to new state. Just return new state.
-    (@inner command $cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+    (@inner command ; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
 
     // If Event have nothing to do on event. Just return __SameState__.
-    (@inner command $cur:ident ; ;) => (
+    (@inner command ; ;) => (
         Some(States::__SameState__)
     );
 
@@ -209,6 +242,24 @@ macro_rules! declare_machine {
     (@inner initial $initial:ident{$($init_field:ident:$init_val:expr),*}) => ($initial{$($init_field: $init_val),*});
     (@inner initial $initial:ident) => ($initial{});
 
+    (@cmd_processor $sel:ident ($($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*))=>(
+        fn do_job(&mut self, cmd: & Commands) -> Option<States> {
+            match *cmd {
+                $(Commands::$cmd => {declare_machine!(@inner command self:$sel;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
+                _ => None
+            }
+        }
+    );
+
+    (@cmd_processor ($($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*))=>(
+        fn do_job(&mut self, cmd: & Commands) -> Option<States> {
+            match *cmd {
+                $(Commands::$cmd => {declare_machine!(@inner command ;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
+                _ => None
+            }
+        }
+    );
+
 // Main pattern
 
 (
@@ -238,14 +289,7 @@ macro_rules! declare_machine {
         declare_machine!(@inner params $state $({$($el:$typ);*})*);
 
         impl CanDoJob for $state {
-            fn do_job(&mut self, cmd: & Commands) -> Option<States> {
-                declare_machine!(@inner context self $($sel)*);
-                match *cmd {
-                    $(Commands::$cmd => {declare_machine!(@inner command self;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
-                    _ => None
-                }
-            }
-
+            declare_machine!(@cmd_processor $($sel)* ($($cmd $($callback)* => $($new_state $({$($new_el:$new_el_val),*})*)*;)*));
             declare_machine!(@inner >> $($sel)* $($income)*);
             declare_machine!(@inner << $($sel)* $($outcome)*);
         }
@@ -296,10 +340,6 @@ macro_rules! declare_machine {
                 }
             }
             fn change_state(&mut self, new_state: States) {
-                match self.state {
-                    States::__SameState__ => Ok(()),
-                    $(States::$state{ ref mut context } => context.leave()),*
-                }.unwrap();
                 self.state = new_state;
                 match self.state {
                     States::__SameState__ => Ok(()),

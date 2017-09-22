@@ -110,15 +110,19 @@ fn main() {
     });
     machine.execute(&Simple::Commands::Next).unwrap();
     assert!(match machine.state(){
-        // We are in state B and have counter == 2. Increment happen on User Code execution. Execution of Leave state callback happen after we transfer data to the next state.
-        States::B{context}=> {println!("context counter: {}", context.counter);if context.counter == 2 {true} else {false}},
+        // We are in state B and have counter == 3. Increment happen on User Code execution and execution of Leave state callback.
+        States::B{context}=> {println!("context counter: {}", context.counter);if context.counter == 3 {true} else {false}},
         _=>false
     });
     machine.execute(&Simple::Commands::Next).unwrap();
     assert!(match machine.state(){
-        // Again in state A and have counter == 4. Increment happen on User Code execution and on state A enter.
-        States::A{context}=> if context.counter == 4 {true} else {false},
+        // Again in state A and have counter == 5. Increment happen on User Code execution and on state A enter.
+        States::A{context}=> if context.counter == 5 {true} else {false},
         _=>false
     });
 }
 ```
+
+# Changes
+## 0.2.0
+Changed behavior of Leave action. Now it execute before new State context creation.
