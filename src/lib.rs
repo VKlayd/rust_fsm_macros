@@ -256,15 +256,6 @@ macro_rules! declare_machine {
         }
     );
 
-    (@cmd_processor  @$glob_context:ident@ ($($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*))=>(
-        fn do_job(&mut self, cmd: & Commands, $glob_context: &mut MachineContext) -> Option<States> {
-            match *cmd {
-                $(Commands::$cmd => {declare_machine!(@inner command @$glob_context@ self:__;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
-                _ => None
-            }
-        }
-    );
-
     (@state $gc_name:ident; $($state:ident @ $sel:ident ; $($income:block)*; ($job:tt); $($outcome:block)*@),*) => (
         $(
         impl CanDoJob for $state {
@@ -287,18 +278,18 @@ macro_rules! declare_machine {
     (@state $gc_name:ident; $($state:ident@; $($income:block)*; ($job:tt); $($outcome:block)*@),*) => (
         $(
         impl CanDoJob for $state {
-            declare_machine!(@cmd_processor @$gc_name@ $job);
-            declare_machine!(@inner >> @$gc_name@ $($income)*);
-            declare_machine!(@inner << @$gc_name@ $($outcome)*);
+            declare_machine!(@cmd_processor ___ @$gc_name@ $job);
+            declare_machine!(@inner >> ___ @$gc_name@ $($income)*);
+            declare_machine!(@inner << ___ @$gc_name@ $($outcome)*);
         }
         )*
     );
     (@state ; $($state:ident@; $($income:block)*; ($job:tt); $($outcome:block)*@),*) => (
         $(
         impl CanDoJob for $state {
-            declare_machine!(@cmd_processor @__@ $job);
-            declare_machine!(@inner >> @__@ $($income)*);
-            declare_machine!(@inner << @__@ $($outcome)*);
+            declare_machine!(@cmd_processor ___ @__@ $job);
+            declare_machine!(@inner >> ___ @__@ $($income)*);
+            declare_machine!(@inner << ___ @__@ $($outcome)*);
         }
         )*
     );
