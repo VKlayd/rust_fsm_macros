@@ -13,7 +13,7 @@
 //! #[macro_use] extern crate macro_machine;
 //!
 //! declare_machine!(
-//!     Simple gc(A) // Name and initial State
+//!     Simple (A) // Name and initial State
 //!     states[A,B] // list of States
 //!     commands[Next] // list of Commands
 //!     (A: // State Node
@@ -42,7 +42,7 @@
 //! #[macro_use] extern crate macro_machine;
 //!
 //! declare_machine!(
-//!     Simple gc(A{counter:0}) // Name and initial State with initial value
+//!     Simple (A{counter:0}) // Name and initial State with initial value
 //!     states[A,B] // list of States
 //!     commands[Next] // list of Commands
 //!     (A context{counter:i16}: // State Node and this state context description with binding name
@@ -77,7 +77,7 @@
 //! #[macro_use] extern crate macro_machine;
 //!
 //! declare_machine!(
-//!     Simple gc(A{counter:0}) // Name and initial State with initial value
+//!     Simple (A{counter:0}) // Name and initial State with initial value
 //!     states[A,B] // list of States
 //!     commands[Next] // list of Commands
 //!     (A context{counter:i16}: // State Node and this state context description with binding name
@@ -135,7 +135,7 @@ macro_rules! declare_machine {
     );
 
     // If Event have user-defined code and move machine to new state. Execute code and return new state.
-    (@inner command /$glob_context:ident/ $sel:ident:$cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             declare_machine!(@inner context $sel $cur);
             $callback;
@@ -145,7 +145,7 @@ macro_rules! declare_machine {
     );
 
     // If Event have user-defined code and don't move machine to new state. Execute code and return __SameState__ .
-    (@inner command /$glob_context:ident/ $sel:ident:$cur:ident;$callback:block;) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident;$callback:block;) => (
         {
             declare_machine!(@inner context $sel $cur);
             $callback;
@@ -154,7 +154,7 @@ macro_rules! declare_machine {
     );
 
     // If Event have no user-defined code and move machine to new state. Just return new state.
-    (@inner command /$glob_context:ident/ $sel:ident:$cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
             declare_machine!(@inner context $sel $cur);
             $cur.leave($glob_context).unwrap();
@@ -163,37 +163,40 @@ macro_rules! declare_machine {
     );
 
     // If Event have nothing to do on event. Just return __SameState__.
-    (@inner command /$glob_context:ident/ $sel:ident:$cur:ident ; ;) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident ; ;) => (
         Some(States::__SameState__)
     );
 
     // If Event have user-defined code and move machine to new state. Execute code and return new state.
-    (@inner command /$glob_context:ident/  $sel:ident:;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident;$callback:block;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
+            declare_machine!(@inner context $sel $cur);
             $callback;
-            $sel.leave(global_context).unwrap();
+            $cur.leave($glob_context).unwrap();
             Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
 
     // If Event have user-defined code and don't move machine to new state. Execute code and return __SameState__ .
-    (@inner command /$glob_context:ident/ $sel:ident:;$callback:block;) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident;$callback:block;) => (
         {
+            declare_machine!(@inner context $sel $cur);
             $callback;
             Some(States::__SameState__)
         }
     );
 
     // If Event have no user-defined code and move machine to new state. Just return new state.
-    (@inner command /$glob_context:ident/ $sel:ident:; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident; ;$new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*) => (
         {
-            $sel.leave($glob_context).unwrap();
+            declare_machine!(@inner context $sel $cur);
+            $cur.leave($glob_context).unwrap();
             Some(States::$new_state{context: declare_machine!(@inner next $new_state$({$($new_el:$new_el_val),*})*)})
         }
     );
 
     // If Event have nothing to do on event. Just return __SameState__.
-    (@inner command /$glob_context:ident/ $sel:ident:; ;) => (
+    (@inner command @$glob_context:ident@ $sel:ident:$cur:ident ; ;) => (
         Some(States::__SameState__)
     );
 
@@ -201,26 +204,26 @@ macro_rules! declare_machine {
     (@inner context $ss:ident )=>();
 
     // Enter/Leave processors with and without user-defined code.
-    (@inner >> $($sel:ident)* /$glob_context:ident/ $income:block) => (
+    (@inner >> $($sel:ident)* @$glob_context:ident@ $income:block) => (
             fn enter(&mut self, $glob_context: &mut MachineContext) -> Result<(), ()> {
                 declare_machine!(@inner context self $($sel)*);
                 $income
                 Ok(())
             }
     );
-    (@inner << $($sel:ident)* /$glob_context:ident/ $outcome:block) => (
+    (@inner << $($sel:ident)* @$glob_context:ident@ $outcome:block) => (
             fn leave(&mut self, $glob_context: &mut MachineContext) -> Result<(), ()> {
                 declare_machine!(@inner context self $($sel)*);
                 $outcome
                 Ok(())
             }
     );
-    (@inner >> $($sel:ident)* /$glob_context:ident/ ) => (
+    (@inner >> $($sel:ident)* @$glob_context:ident@ ) => (
             fn enter(&mut self, $glob_context: &mut MachineContext) -> Result<(), ()> {
                 Ok(())
             }
     );
-    (@inner << $($sel:ident)* /$glob_context:ident/ ) => (
+    (@inner << $($sel:ident)* @$glob_context:ident@ ) => (
             fn leave(&mut self, $glob_context: &mut MachineContext) -> Result<(), ()> {
                 Ok(())
             }
@@ -244,28 +247,66 @@ macro_rules! declare_machine {
     (@inner initial $initial:ident{$($init_field:ident:$init_val:expr),*}) => ($initial{$($init_field: $init_val),*});
     (@inner initial $initial:ident) => ($initial{});
 
-    (@cmd_processor $sel:ident /$glob_context:ident/ ($($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*))=>(
+    (@cmd_processor $sel:ident @$glob_context:ident@ ($($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*))=>(
         fn do_job(&mut self, cmd: & Commands, $glob_context: &mut MachineContext) -> Option<States> {
             match *cmd {
-                $(Commands::$cmd => {declare_machine!(@inner command /$glob_context/ self:$sel;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
+                $(Commands::$cmd => {declare_machine!(@inner command @$glob_context@ self:$sel;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
                 _ => None
             }
         }
     );
 
-    (@cmd_processor  /$glob_context:ident/ ($($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*))=>(
+    (@cmd_processor  @$glob_context:ident@ ($($cmd:ident $($callback:block)* => $($new_state:ident$({$($new_el:ident:$new_el_val:expr),*})*)*;)*))=>(
         fn do_job(&mut self, cmd: & Commands, $glob_context: &mut MachineContext) -> Option<States> {
             match *cmd {
-                $(Commands::$cmd => {declare_machine!(@inner command /$glob_context/ self:;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
+                $(Commands::$cmd => {declare_machine!(@inner command @$glob_context@ self:__;$($callback)*;$($new_state$({$($new_el:$new_el_val),*})*)*)})*
                 _ => None
             }
         }
+    );
+
+    (@state $gc_name:ident; $($state:ident @ $sel:ident ; $($income:block)*; ($job:tt); $($outcome:block)*@),*) => (
+        $(
+        impl CanDoJob for $state {
+            declare_machine!(@cmd_processor $sel @$gc_name@ $job);
+            declare_machine!(@inner >> $sel @$gc_name@ $($income)*);
+            declare_machine!(@inner << $sel @$gc_name@ $($outcome)*);
+        }
+        )*
+    );
+    (@state ; $($state:ident @ $sel:ident ; $($income:block)*; ($job:tt); $($outcome:block)* @),*) => (
+        $(
+        impl CanDoJob for $state {
+            declare_machine!(@cmd_processor $sel @__@ $job);
+            declare_machine!(@inner >> $sel @__@ $($income)*);
+            declare_machine!(@inner << $sel @__@ $($outcome)*);
+        }
+        )*
+    );
+
+    (@state $gc_name:ident; $($state:ident@; $($income:block)*; ($job:tt); $($outcome:block)*@),*) => (
+        $(
+        impl CanDoJob for $state {
+            declare_machine!(@cmd_processor @$gc_name@ $job);
+            declare_machine!(@inner >> @$gc_name@ $($income)*);
+            declare_machine!(@inner << @$gc_name@ $($outcome)*);
+        }
+        )*
+    );
+    (@state ; $($state:ident@; $($income:block)*; ($job:tt); $($outcome:block)*@),*) => (
+        $(
+        impl CanDoJob for $state {
+            declare_machine!(@cmd_processor @__@ $job);
+            declare_machine!(@inner >> @__@ $($income)*);
+            declare_machine!(@inner << @__@ $($outcome)*);
+        }
+        )*
     );
 
 // Main pattern
 
 (
-    $machine:ident $gc_name:ident$({$($context_field:ident:$context_type:ty),*})* ($initial:ident$({$($init_field:ident:$init_val:expr),*})*)
+    $machine:ident $($gc_name:ident{$($context_field:ident:$context_type:ty),*})* ($initial:ident$({$($init_field:ident:$init_val:expr),*})*)
     states[$($states:ident),*]
     commands[$($commands:ident),*]
 
@@ -289,14 +330,9 @@ macro_rules! declare_machine {
 
         $(
         declare_machine!(@inner params $state $({$($el:$typ);*})*);
-
-        impl CanDoJob for $state {
-            declare_machine!(@cmd_processor $($sel)* /$gc_name/ ($($cmd $($callback)* => $($new_state $({$($new_el:$new_el_val),*})*)*;)*));
-            declare_machine!(@inner >> $($sel)* /$gc_name/ $($income)*);
-            declare_machine!(@inner << $($sel)* /$gc_name/ $($outcome)*);
-        }
         )*
 
+        declare_machine!(@state $($gc_name)*;$($state @ $($sel)* ; $($income)*; (($($cmd $($callback)* => $($new_state $({$($new_el:$new_el_val),*})*)*;)*)); $($outcome)*@),*);
 
         #[derive(Debug)]
         #[derive(PartialEq)]
@@ -367,7 +403,7 @@ mod tests {
     }
 
     declare_machine!(
-    Mach1 gc(New{x:0})
+    Mach1 (New{x:0})
 
     states[New,InConfig,Operational]
     commands[Configure, ConfigureDone, Drop]
@@ -392,7 +428,7 @@ mod tests {
     );
 
     declare_machine!(
-    Mach2 gc(State1)
+    Mach2 (State1)
 
     states[State1,State2,State3]
     commands[ToState1, ToState2, ToState3]
@@ -431,25 +467,25 @@ mod tests {
     }
 
     declare_machine!(
-    Mach3 glob_cont{id:i16}(State1)
+    Mach3 glob_cont{id:i16}(State1{counter:0})
 
     states[State1,State2,State3]
     commands[ToState1, ToState2, ToState3]
 
-    ( State1 cont:
+    ( State1 cont{counter:i16}:
         >>{println!("Mach {} enter {:?}", glob_cont.id, cont);}
-        <<{println!("Mach {} leave {:?}", glob_cont.id, cont);}
-        ToState2 => State2;
+        <<{cont.counter+=1; println!("Mach {} leave {:?}", glob_cont.id, cont);}
+        ToState2 => State2{counter: cont.counter};
     )
-    ( State2 cont:
+    ( State2 cont{counter:i16}:
         >>{println!("Mach {} enter {:?}", glob_cont.id, cont);}
-        <<{println!("Mach {} leave {:?}", glob_cont.id, cont);}
-        ToState3 => State3;
+        <<{cont.counter+=1; println!("Mach {} leave {:?}", glob_cont.id, cont);}
+        ToState3 => State3{counter: cont.counter};
     )
-    ( State3 cont:
+    ( State3 cont{counter:i16}:
         >>{println!("Mach {} enter {:?}", glob_cont.id, cont);}
-        <<{println!("Mach {} leave {:?}", glob_cont.id, cont);}
-        ToState1 => State1;
+        <<{cont.counter+=1; println!("Mach {} leave {:?}", glob_cont.id, cont);}
+        ToState1 => State1{counter: cont.counter};
     )
     );
 
@@ -463,5 +499,43 @@ mod tests {
         m1.execute(&Mach3::Commands::ToState3).unwrap();
     }
 
+    pub struct InnerMachineContext {
+        id: i16,
+        name: String,
+        counter: i16
+    }
 
+    declare_machine!(
+        Mach4 inner{st: InnerMachineContext} (State1)
+        states[State1,State2,State3]
+        commands[ToState1, ToState2, ToState3]
+
+        ( State1 :
+            << {println!("id={} name={} counter={}", inner.st.id, inner.st.name, inner.st.counter);}
+            ToState2 {inner.st.counter+=1;}=> State2;
+        )
+        ( State2 :
+            << {println!("id={} name={} counter={}", inner.st.id, inner.st.name, inner.st.counter);}
+            ToState3 {inner.st.counter+=1;}=> State3;
+        )
+        ( State3 :
+            << {println!("id={} name={} counter={}", inner.st.id, inner.st.name, inner.st.counter);}
+            ToState1 {inner.st.counter+=1;}=> State1;
+        )
+    );
+    #[test]
+    fn test4() {
+        let mut m = Mach4::new(InnerMachineContext{id:0, name: String::from("Mach 0"), counter: 0});
+        let mut m1 = Mach4::new(InnerMachineContext{id:1, name: String::from("Mach 1"), counter: 0});
+        let mut m2 = Mach4::new(InnerMachineContext{id:2, name: String::from("Mach 2"), counter: 0});
+        m.execute(&Mach4::Commands::ToState2).unwrap();
+        m.execute(&Mach4::Commands::ToState3).unwrap();
+        m1.execute(&Mach4::Commands::ToState2).unwrap();
+        m.execute(&Mach4::Commands::ToState1).unwrap();
+        m1.execute(&Mach4::Commands::ToState3).unwrap();
+        m2.execute(&Mach4::Commands::ToState2).unwrap();
+        m.execute(&Mach4::Commands::ToState2).unwrap();
+        m2.execute(&Mach4::Commands::ToState3).unwrap();
+        m1.execute(&Mach4::Commands::ToState1).unwrap();
+    }
 }
