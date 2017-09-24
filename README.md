@@ -125,4 +125,5 @@ fn main() {
 
 # Changes
 ## 0.2.0
-Changed behavior of Leave action. Now it execute before new State context creation.
+* Changed behavior of Leave action. Now it execute before new State context creation.
+* Add machine-scoped context. It can be used by all callbacks inside machine. Data in this context have machine's life-time.
