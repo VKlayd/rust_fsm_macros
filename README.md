@@ -26,7 +26,7 @@ Each **command reaction** contains:
 
 ## Working example to begin with
 
-Let's say we'd like to implement such machne:
+Let's say we'd like to implement such machine:
 
 ![FSM example](http://www.plantuml.com/plantuml/proxy?src=https://gist.githubusercontent.com/goldenreign/e363fe08501362d9618f2012f1ddfe2f/raw/07bb4bc604a204e7bcef38154135ee8a14c10f5b/gistfile1.puml "FSM example")
 
