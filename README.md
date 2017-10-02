@@ -28,7 +28,7 @@ Each **command reaction** contains:
 
 Let's say we'd like to implement such machne:
 
-![FSM example](https://www.plantuml.com/plantuml/png/bPC_QyCm4CLtVOf3GmULu7ODhOaFNEZGBXqwb0ucllm1sGwo0e7Ixzwp8pboQrnbybdtTFSUFxHgRM7iiTBmzFO2T2ggWoOXFjGdBCn-kxEB539OmiFDkYafbNBT76jB1XxXJaeX-BebLdm9W7CjbNgkjuRQLYa9HGlkBnifIas-pUMerwsggg8kqrSwMTXnfSauTNSqKkVXgjnjOa6VWCq7stqv7STNjt3FmG9rFyMPxBzBI9BtOczXqnXmNfF4TtjzRvFt_4wZ5CjyCyB4MTfDp8SOUU2BKmOd4IE_XSWkP77QegEA4LHnXYfUHHN_eOeJLF722Q-YYWDLTDnmbYeEL76EAiPJnO0g3Wpn3rMCfCetDMtySvs2kgAwv8V-0m00 "FSM example")
+![FSM example](http://www.plantuml.com/plantuml/proxy?src=https://gist.githubusercontent.com/goldenreign/e363fe08501362d9618f2012f1ddfe2f/raw/07bb4bc604a204e7bcef38154135ee8a14c10f5b/gistfile1.puml "FSM example")
 
 Corresponding code will look like:
 
