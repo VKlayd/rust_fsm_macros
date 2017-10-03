@@ -195,6 +195,39 @@ fn main() {
 }
 ```
 
+Example of Machine-scoped context. This context exist in machine life-time.
+
+Let's count machine's state changes:
+
+```rust
+#[macro_use] extern crate macro_machine;
+declare_machine!(
+    Simple machine_context{counter: i16} (A) // Declare machine scoped context
+    states[A,B]
+    commands[Next]
+    (A :
+        >> {machine_context.counter=machine_context.counter+1;} // Add 1 when enter in state
+        Next => B; // Just switch to other state
+    )
+    (B :
+        >> {machine_context.counter=machine_context.counter+1;}
+        Next => A;
+    )
+);
+fn main() {
+    use Simple::*;
+    let mut machine = Simple::new(0); // Create machine and initiate machine context by 0
+    let context = machine.get_inner_context();
+    assert!(context.counter == 1);
+    machine.execute(&Simple::Commands::Next).unwrap();
+    let context = machine.get_inner_context();
+    assert!(context.counter == 2);
+    machine.execute(&Simple::Commands::Next).unwrap();
+    let context = machine.get_inner_context();
+    assert!(context.counter == 3);
+}
+```
+
 ## Changelog
 
 ### 0.2.0

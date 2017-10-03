@@ -120,6 +120,42 @@
 //! # }
 //! ```
 //!
+//! Example of Machine-scoped context. This context exist in machine life-time.
+//!
+//! Lets count machine's state changes:
+//!
+//! ```
+//! #[macro_use] extern crate macro_machine;
+//!
+//! declare_machine!(
+//!     Simple machine_context{counter: i16} (A) // Declare machine scoped context
+//!     states[A,B]
+//!     commands[Next]
+//!     (A :
+//!         >> {machine_context.counter=machine_context.counter+1;} // Add 1 when enter in state
+//!         Next => B; // Just switch to other state
+//!     )
+//!     (B :
+//!         >> {machine_context.counter=machine_context.counter+1;}
+//!         Next => A;
+//!     )
+//! );
+//!
+//! # fn main() {
+//! use Simple::*;
+//!
+//! let mut machine = Simple::new(0);
+//! let context = machine.get_inner_context();
+//! assert!(context.counter == 1);
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! let context = machine.get_inner_context();
+//! assert!(context.counter == 2);
+//! machine.execute(&Simple::Commands::Next).unwrap();
+//! let context = machine.get_inner_context();
+//! assert!(context.counter == 3);
+//! # }
+//! ```
+//!
 
 #[macro_export]
 macro_rules! declare_machine {
@@ -340,7 +376,8 @@ macro_rules! declare_machine {
             $($commands),*
         }
 
-        struct MachineContext {$($($context_field: $context_type),*)*}
+        #[derive(Clone)]
+        pub struct MachineContext {$($(pub $context_field: $context_type),*)*}
 
         pub struct Machine {
             state: States,
@@ -381,6 +418,9 @@ macro_rules! declare_machine {
             }
             pub fn state(&self) -> States {
                 self.state.clone()
+            }
+            pub fn get_inner_context(&self) -> MachineContext {
+                self.context.clone()
             }
         }
     }
@@ -490,6 +530,7 @@ mod tests {
         m1.execute(&Mach3::Commands::ToState3).unwrap();
     }
 
+    #[derive(Clone)]
     pub struct InnerMachineContext {
         id: i16,
         name: String,
