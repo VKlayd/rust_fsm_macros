@@ -28,11 +28,11 @@
 //! use Simple::*;
 //!
 //! let mut machine = Simple::new();
-//! assert!(match machine.state(){States::A{..}=>true,_=>false});
+//! assert!(match machine.get_current_state(){States::A{..}=>true,_=>false});
 //! machine.execute(&Simple::Commands::Next).unwrap();
-//! assert!(match machine.state(){States::B{..}=>true,_=>false});
+//! assert!(match machine.get_current_state(){States::B{..}=>true,_=>false});
 //! machine.execute(&Simple::Commands::Next).unwrap();
-//! assert!(match machine.state(){States::A{..}=>true,_=>false});
+//! assert!(match machine.get_current_state(){States::A{..}=>true,_=>false});
 //! # }
 //! ```
 //!
@@ -57,17 +57,17 @@
 //! use Simple::*;
 //!
 //! let mut machine = Simple::new();
-//! assert!(match machine.state(){
+//! assert!(match machine.get_current_state(){
 //!     States::A{context}=> if context.counter == 0 {true} else {false}, // We are in state A and have our initial value 0
 //!     _=>false
 //! });
 //! machine.execute(&Simple::Commands::Next).unwrap();
-//! assert!(match machine.state(){
+//! assert!(match machine.get_current_state(){
 //!     States::B{context}=> if context.counter == 1 {true} else {false}, // We are in state B and have counter == 1
 //!     _=>false
 //! });
 //! machine.execute(&Simple::Commands::Next).unwrap();
-//! assert!(match machine.state(){
+//! assert!(match machine.get_current_state(){
 //!     States::A{context}=> if context.counter == 2 {true} else {false}, // Again in state A and have counter == 2
 //!     _=>false
 //! });
@@ -94,7 +94,7 @@
 //! use Simple::*;
 //!
 //! let mut machine = Simple::new();
-//! assert!(match machine.state(){
+//! assert!(match machine.get_current_state(){
 //!
 //!     // We are in state A and have value 1. Because Enter State callback executed.
 //!
@@ -102,7 +102,7 @@
 //!     _=>false
 //! });
 //! machine.execute(&Simple::Commands::Next).unwrap();
-//! assert!(match machine.state(){
+//! assert!(match machine.get_current_state(){
 //!
 //!     // We are in state B and have counter == 3. Increment happen on User Code execution. Execution of Leave state callback happen after we transfer data to the next state.
 //!
@@ -110,7 +110,7 @@
 //!     _=>false
 //! });
 //! machine.execute(&Simple::Commands::Next).unwrap();
-//! assert!(match machine.state(){
+//! assert!(match machine.get_current_state(){
 //!
 //!     // Again in state A and have counter == 5. Increment happen on User Code execution and on state A enter.
 //!
@@ -416,7 +416,7 @@ macro_rules! declare_machine {
                     $(States::$state{ ref mut context } => context.enter(&mut self.context)),*
                 }.unwrap();
             }
-            pub fn state(&self) -> States {
+            pub fn get_current_state(&self) -> States {
                 self.state.clone()
             }
             pub fn get_inner_context(&self) -> MachineContext {
