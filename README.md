@@ -134,21 +134,21 @@ fn main() {
     let mut machine = Simple::new();
 
     // We are in state A and have our initial value 0
-    assert!(match machine.state(){
+    assert!(match machine.get_current_state(){
         States::A{context}=> if context.counter == 0 {true} else {false},
         _=>false
     });
     machine.execute(&Simple::Commands::Next).unwrap();
 
     // We are in state B and have counter == 1
-    assert!(match machine.state(){
+    assert!(match machine.get_current_state(){
         States::B{context}=> if context.counter == 1 {true} else {false},
         _=>false
     });
     machine.execute(&Simple::Commands::Next).unwrap();
 
     // Again in state A and have counter == 2
-    assert!(match machine.state(){
+    assert!(match machine.get_current_state(){
         States::A{context}=> if context.counter == 2 {true} else {false},
         _=>false
     });
@@ -175,19 +175,19 @@ declare_machine!(
 fn main() {
     use Simple::*;
     let mut machine = Simple::new();
-    assert!(match machine.state(){
+    assert!(match machine.get_current_state(){
         // We are in state A and have value 1. Because Enter State callback executed.
         States::A{context}=> if context.counter == 1 {true} else {false},
         _=>false
     });
     machine.execute(&Simple::Commands::Next).unwrap();
-    assert!(match machine.state(){
+    assert!(match machine.get_current_state(){
         // We are in state B and have counter == 3. Increment happen on User Code execution and execution of Leave state callback.
         States::B{context}=> {println!("context counter: {}", context.counter);if context.counter == 3 {true} else {false}},
         _=>false
     });
     machine.execute(&Simple::Commands::Next).unwrap();
-    assert!(match machine.state(){
+    assert!(match machine.get_current_state(){
         // Again in state A and have counter == 5. Increment happen on User Code execution and on state A enter.
         States::A{context}=> if context.counter == 5 {true} else {false},
         _=>false
